@@ -1,0 +1,463 @@
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@300;400;500&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+#root-wrap{height:600px;display:flex;flex-direction:column;background:#070B14;color:#C0CFDF;font-family:'Barlow',sans-serif;font-size:12px;overflow:hidden;border-radius:8px}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:#1C2840;border-radius:2px}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+@keyframes newCard{0%{background:rgba(255,180,0,0.18)}100%{background:transparent}}
+.blink{animation:blink 1s step-end infinite}.fade-up{animation:fadeUp 0.25s ease forwards}.new-card{animation:newCard 3s ease forwards}
+.leaflet-container{background:#020508 !important}
+.leaflet-layer{filter:brightness(0.14) saturate(0.28) hue-rotate(200deg) !important}
+.leaflet-control-zoom{border:1px solid #1A2535 !important;border-radius:3px !important;overflow:hidden}
+.leaflet-control-zoom a{background:#0A1320 !important;color:#3A5575 !important;border-bottom:1px solid #1A2535 !important;line-height:24px !important;width:24px !important;height:24px !important;font-size:14px !important}
+.leaflet-control-zoom a:hover{background:#122030 !important;color:#7A9AB8 !important}
+.leaflet-popup-content-wrapper{background:#0A1220 !important;border:1px solid #1A2840 !important;border-radius:4px !important;color:#90A8C0 !important;font-family:'IBM Plex Mono',monospace !important;font-size:11px !important;box-shadow:0 8px 32px rgba(0,0,0,0.7) !important;padding:0 !important}
+.leaflet-popup-content{margin:9px 12px !important;line-height:1.6}
+.leaflet-popup-tip{background:#0A1220 !important}
+.leaflet-popup-close-button{color:#3A5575 !important}
+.leaflet-attribution-flag{display:none !important}
+.leaflet-control-attribution{display:none !important}
+</style>
+
+<div id="root-wrap">
+  <div id="topbar" style="height:44px;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid #122030;background:#090E1A;justify-content:space-between;flex-shrink:0">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="width:3px;height:18px;background:#FF3B2F;border-radius:1px"></div>
+      <div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;letter-spacing:0.12em;color:#C0CFDF;line-height:1.1">ATLANTA RSOC</div>
+        <div style="color:#3A4F6C;font-size:8px;font-family:'IBM Plex Mono',monospace;letter-spacing:0.12em">ROAD SAFETY OPERATIONS CENTER</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:18px">
+      <div id="stat-active" style="text-align:center"><div style="font-family:'IBM Plex Mono',monospace;font-size:19px;color:#C0CFDF;line-height:1">0</div><div style="color:#3A4F6C;font-size:8px;letter-spacing:0.1em">ACTIVE</div></div>
+      <div id="stat-critical" style="text-align:center"><div style="font-family:'IBM Plex Mono',monospace;font-size:19px;color:#FF3B2F;line-height:1">0</div><div style="color:#3A4F6C;font-size:8px;letter-spacing:0.1em">CRITICAL</div></div>
+      <div id="stat-resolved" style="text-align:center"><div style="font-family:'IBM Plex Mono',monospace;font-size:19px;color:#00C890;line-height:1">0</div><div style="color:#3A4F6C;font-size:8px;letter-spacing:0.1em">RESOLVED</div></div>
+      <div style="display:flex;align-items:center;gap:5px;margin-left:6px">
+        <div style="width:5px;height:5px;border-radius:50%;background:#00C890" class="blink"></div>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#00C890">LIVE</span>
+        <span id="clock" style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#6A85A8;margin-left:5px">00:00:00</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:#3A4F6C">EST</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="flex:1;display:flex;overflow:hidden">
+    <!-- LEFT PANEL -->
+    <div style="width:232px;display:flex;flex-direction:column;border-right:1px solid #122030;flex-shrink:0">
+      <div style="display:flex;border-bottom:1px solid #122030;flex-shrink:0">
+        <button id="tab-live" onclick="switchTab('LIVE')" style="flex:1;padding:7px 0;background:#0C1220;border:none;border-bottom:2px solid #00D2E0;color:#C0CFDF;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:0.1em;cursor:pointer">LIVE <span id="live-count">(0)</span></button>
+        <button id="tab-hist" onclick="switchTab('HIST')" style="flex:1;padding:7px 0;background:transparent;border:none;border-bottom:2px solid transparent;color:#3A4F6C;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:0.1em;cursor:pointer">HISTORICAL</button>
+      </div>
+      <div id="feed-label" style="padding:4px 8px;color:#3A4F6C;font-size:8px;font-family:'IBM Plex Mono',monospace;border-bottom:1px solid #122030;flex-shrink:0"></div>
+      <div id="incident-list" style="flex:1;overflow-y:auto;padding:4px"></div>
+    </div>
+
+    <!-- MAP -->
+    <div style="flex:1;position:relative">
+      <div id="map" style="width:100%;height:100%"></div>
+      <div style="position:absolute;bottom:12px;left:10px;z-index:1000;background:rgba(9,14,26,0.93);border:1px solid #1C3045;border-radius:4px;padding:6px 10px">
+        <div style="color:#3A4F6C;font-size:8px;font-family:'Barlow Condensed',sans-serif;letter-spacing:0.12em;margin-bottom:4px">LEGEND</div>
+        <div style="display:flex;align-items:center;gap:5px;margin-bottom:2px"><span style="color:#FF3B2F;font-size:12px">◉</span><span style="color:#7A90B0;font-size:9px">Live incident</span></div>
+        <div style="display:flex;align-items:center;gap:5px;margin-bottom:2px"><span style="color:#FF3B2F;font-size:8px">●</span><span style="color:#7A90B0;font-size:9px">Fatal (FARS)</span></div>
+        <div style="display:flex;align-items:center;gap:5px;margin-bottom:2px"><span style="color:#FFB400;font-size:8px">●</span><span style="color:#7A90B0;font-size:9px">Serious (FARS)</span></div>
+        <div style="display:flex;align-items:center;gap:5px"><span style="color:#FF7B00;font-size:8px">●</span><span style="color:#7A90B0;font-size:9px">Moderate (FARS)</span></div>
+        <div style="color:#3A4F6C;font-size:7px;border-top:1px solid #122030;padding-top:4px;margin-top:3px">NHTSA FARS 2022–2023</div>
+      </div>
+    </div>
+
+    <!-- RIGHT: AI PANEL -->
+    <div style="width:278px;display:flex;flex-direction:column;border-left:1px solid #122030;flex-shrink:0;overflow:hidden">
+      <div style="padding:6px 12px;border-bottom:1px solid #122030;background:#090E1A;flex-shrink:0;display:flex;align-items:center;gap:7px">
+        <div style="width:5px;height:5px;border-radius:50%;background:#00D2E0" class="blink"></div>
+        <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:0.12em;color:#00D2E0">ARIA</span>
+        <span style="color:#3A4F6C;font-size:8px;font-family:'IBM Plex Mono',monospace">AI ROAD INTELLIGENCE ADVISOR</span>
+      </div>
+      <div id="ai-panel" style="flex:1;overflow-y:auto;padding:0">
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#3A4F6C;padding:30px 20px;text-align:center">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;letter-spacing:0.12em;line-height:2">SELECT AN INCIDENT<br>TO INITIALIZE ARIA</div>
+          <div style="font-size:10px;color:#2A3A50;margin-top:8px">Click any card or map marker</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- QUERY BAR -->
+  <div id="query-section" style="border-top:1px solid #122030;background:#090E1A;flex-shrink:0">
+    <div id="aria-response" style="display:none;padding:7px 12px;border-bottom:1px solid #122030;display:flex;gap:8px;align-items:flex-start"></div>
+    <div style="display:flex;align-items:center;gap:8px;padding:7px 12px">
+      <span style="color:#00D2E0;font-family:'IBM Plex Mono',monospace;font-size:13px;line-height:1">⟩_</span>
+      <input id="nl-input" placeholder='Ask ARIA: "Which corridor is highest risk?" or "Best units for I-285 rollover?"'
+        style="flex:1;background:transparent;border:none;outline:none;color:#C0CFDF;font-family:'IBM Plex Mono',monospace;font-size:10px;caret-color:#00D2E0"/>
+      <button id="query-btn" onclick="submitQuery()" style="padding:4px 12px;background:rgba(0,210,224,0.1);border:1px solid rgba(0,210,224,0.3);border-radius:3px;color:#00D2E0;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:0.08em;cursor:pointer;flex-shrink:0">SEND</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+
+<script>
+const C = {
+  red:'#FF3B2F',amber:'#FFB400',green:'#00C890',blue:'#2A96FF',cyan:'#00D2E0',
+  text:'#C0CFDF',text2:'#6A85A8',muted:'#3A4F6C',
+  panel:'#090E1A',panel2:'#0C1220',b1:'#122030',b2:'#1C3045',bg:'#070B14'
+};
+const SEV = {
+  FATAL:   {c:'#FF3B2F',bg:'rgba(255,59,47,0.12)',bd:'rgba(255,59,47,0.35)'},
+  SERIOUS: {c:'#FFB400',bg:'rgba(255,180,0,0.12)', bd:'rgba(255,180,0,0.35)'},
+  MODERATE:{c:'#FF7B00',bg:'rgba(255,123,0,0.1)',  bd:'rgba(255,123,0,0.3)'},
+  MINOR:   {c:'#00C890',bg:'rgba(0,200,144,0.1)',  bd:'rgba(0,200,144,0.3)'},
+};
+
+const FARS = [
+  {id:'FARS-GA23-0847',lat:33.7191,lng:-84.4621,location:'I-285 W & Campbellton Rd SW',severity:'FATAL',date:'2023-08-19',time:'01:47',weather:'Clear',road:'Dry',vehicles:2,fatalities:1,injuries:3,factors:['Speeding','DUI'],type:'Multi-vehicle'},
+  {id:'FARS-GA23-0312',lat:33.6470,lng:-84.4350,location:'I-285 S & Old National Hwy',severity:'FATAL',date:'2023-04-07',time:'22:15',weather:'Rain',road:'Wet',vehicles:3,fatalities:2,injuries:1,factors:['Wet road','Speeding'],type:'Chain reaction'},
+  {id:'FARS-GA22-1203',lat:33.7200,lng:-84.2930,location:'I-285 E & Glenwood Ave SE',severity:'FATAL',date:'2022-11-12',time:'03:22',weather:'Clear',road:'Dry',vehicles:1,fatalities:1,injuries:0,factors:['DUI','Speeding'],type:'Single vehicle'},
+  {id:'FARS-GA23-0519',lat:33.7410,lng:-84.5200,location:'I-20 W at Thornton Rd',severity:'SERIOUS',date:'2023-06-22',time:'17:45',weather:'Clear',road:'Dry',vehicles:2,fatalities:0,injuries:4,factors:['Distracted driving','Rush hour'],type:'Rear-end'},
+  {id:'FARS-GA22-0876',lat:33.7430,lng:-84.3200,location:'I-20 E at Moreland Ave',severity:'FATAL',date:'2022-09-03',time:'14:30',weather:'Clear',road:'Dry',vehicles:2,fatalities:1,injuries:2,factors:['Lane change','Speeding'],type:'Sideswipe'},
+  {id:'FARS-GA23-0731',lat:33.7002,lng:-84.4901,location:'Campbellton Rd SW & Cascade Ave',severity:'FATAL',date:'2023-09-14',time:'20:55',weather:'Clear',road:'Dry',vehicles:2,fatalities:1,injuries:1,factors:['Red light','Speeding'],type:'T-bone'},
+  {id:'FARS-GA22-0445',lat:33.6950,lng:-84.5050,location:'Campbellton Rd SW & Centra Villa Dr',severity:'SERIOUS',date:'2022-07-28',time:'23:10',weather:'Clear',road:'Dry',vehicles:1,fatalities:0,injuries:2,factors:['DUI','Speeding'],type:'Run-off road'},
+  {id:'FARS-GA23-0622',lat:33.7001,lng:-84.4200,location:'Metropolitan Pkwy SW & Sullivan Rd',severity:'FATAL',date:'2023-07-31',time:'00:23',weather:'Clear',road:'Dry',vehicles:2,fatalities:1,injuries:3,factors:['DUI','Speeding'],type:'Head-on'},
+  {id:'FARS-GA22-1108',lat:33.6880,lng:-84.4150,location:'Metropolitan Pkwy SW & Sylvan Rd',severity:'FATAL',date:'2022-10-15',time:'02:44',weather:'Clear',road:'Dry',vehicles:1,fatalities:1,injuries:0,factors:['DUI'],type:'Fixed object'},
+  {id:'FARS-GA23-0234',lat:33.7312,lng:-84.3401,location:'Moreland Ave SE & Memorial Dr',severity:'FATAL',date:'2023-03-29',time:'19:37',weather:'Clear',road:'Dry',vehicles:2,fatalities:1,injuries:2,factors:['Red light'],type:'Angle collision'},
+  {id:'FARS-GA22-0789',lat:33.7380,lng:-84.3290,location:'Memorial Dr SE & Flat Shoals Ave',severity:'SERIOUS',date:'2022-08-16',time:'21:15',weather:'Clear',road:'Dry',vehicles:2,fatalities:0,injuries:3,factors:['Speeding','Red light'],type:'Angle collision'},
+  {id:'FARS-GA23-0415',lat:33.7601,lng:-84.4501,location:'Donald Lee Hollowell Pkwy & Hollywood Rd',severity:'FATAL',date:'2023-05-18',time:'01:12',weather:'Clear',road:'Dry',vehicles:2,fatalities:1,injuries:1,factors:['DUI','Speeding'],type:'Head-on'},
+  {id:'FARS-GA23-0901',lat:33.8401,lng:-84.3101,location:'Buford Hwy NE & Clairmont Rd',severity:'FATAL',date:'2023-10-02',time:'08:22',weather:'Fog',road:'Wet',vehicles:2,fatalities:1,injuries:2,factors:['Fog','Speeding'],type:'Head-on'},
+  {id:'FARS-GA22-1345',lat:33.8601,lng:-84.2950,location:'Buford Hwy NE & Shallowford Rd',severity:'SERIOUS',date:'2022-12-05',time:'17:55',weather:'Rain',road:'Wet',vehicles:3,fatalities:0,injuries:5,factors:['Wet road','Rush hour'],type:'Chain reaction'},
+  {id:'FARS-GA23-0156',lat:33.7580,lng:-84.3930,location:'I-75/85 Connector at 10th St',severity:'SERIOUS',date:'2023-02-14',time:'07:30',weather:'Clear',road:'Dry',vehicles:4,fatalities:0,injuries:6,factors:['Rush hour','Distracted driving'],type:'Multi-vehicle'},
+  {id:'FARS-GA22-0567',lat:33.7620,lng:-84.3890,location:'I-75/85 Connector at Spring St',severity:'FATAL',date:'2022-06-10',time:'03:15',weather:'Clear',road:'Dry',vehicles:2,fatalities:1,injuries:1,factors:['DUI','Speeding'],type:'Rear-end'},
+  {id:'FARS-GA23-0678',lat:33.7050,lng:-84.3020,location:'Flat Shoals Rd & Gresham Rd SE',severity:'FATAL',date:'2023-08-04',time:'22:48',weather:'Clear',road:'Dry',vehicles:2,fatalities:1,injuries:2,factors:['Red light','Speeding'],type:'Angle collision'},
+  {id:'FARS-GA23-0989',lat:33.7700,lng:-84.3050,location:'I-285 NE at Chamblee-Tucker Rd',severity:'SERIOUS',date:'2023-11-11',time:'06:15',weather:'Fog',road:'Wet',vehicles:2,fatalities:0,injuries:3,factors:['Fog','Speeding'],type:'Rear-end'},
+  {id:'FARS-GA22-0234',lat:33.8050,lng:-84.3801,location:'I-285 N at Peachtree Industrial Blvd',severity:'FATAL',date:'2022-04-23',time:'02:10',weather:'Clear',road:'Dry',vehicles:1,fatalities:1,injuries:0,factors:['DUI','Speeding'],type:'Fixed object'},
+  {id:'FARS-GA23-0345',lat:33.8200,lng:-84.3650,location:'SR-400 N at Holcomb Bridge Rd',severity:'SERIOUS',date:'2023-04-19',time:'17:20',weather:'Clear',road:'Dry',vehicles:3,fatalities:0,injuries:4,factors:['Rush hour','Distracted'],type:'Rear-end'},
+  {id:'FARS-GA23-0554',lat:33.6750,lng:-84.4450,location:'Stonewall Tell Rd & Camp Creek Pkwy',severity:'FATAL',date:'2023-06-07',time:'11:30',weather:'Clear',road:'Dry',vehicles:2,fatalities:1,injuries:2,factors:['Stop sign','Speeding'],type:'Angle collision'},
+  {id:'FARS-GA22-1456',lat:33.8650,lng:-84.4650,location:'I-75 N at Delk Rd, Cobb County',severity:'FATAL',date:'2022-11-28',time:'05:45',weather:'Clear',road:'Dry',vehicles:2,fatalities:1,injuries:1,factors:['DUI','Wrong-way driver'],type:'Head-on'},
+  {id:'FARS-GA23-0788',lat:33.7500,lng:-84.2700,location:'I-20 E at Panola Rd, DeKalb',severity:'SERIOUS',date:'2023-09-22',time:'16:10',weather:'Rain',road:'Wet',vehicles:3,fatalities:0,injuries:5,factors:['Wet road','Rush hour'],type:'Chain reaction'},
+  {id:'FARS-GA23-0432',lat:33.7100,lng:-84.4600,location:'Camp Creek Pkwy & I-285',severity:'FATAL',date:'2023-05-01',time:'21:33',weather:'Clear',road:'Dry',vehicles:2,fatalities:1,injuries:3,factors:['Speeding','DUI'],type:'Multi-vehicle'},
+  {id:'FARS-GA22-0321',lat:33.7300,lng:-84.4800,location:'Fulton Industrial Blvd SW & I-20',severity:'FATAL',date:'2022-07-04',time:'02:20',weather:'Clear',road:'Dry',vehicles:3,fatalities:2,injuries:1,factors:['DUI','Speeding'],type:'Multi-vehicle'},
+  {id:'FARS-GA23-0267',lat:33.7890,lng:-84.4200,location:'I-75 N at Howell Mill Rd',severity:'SERIOUS',date:'2023-03-10',time:'08:05',weather:'Rain',road:'Wet',vehicles:4,fatalities:0,injuries:7,factors:['Wet road','Rush hour'],type:'Chain reaction'},
+];
+
+const TEMPLATES = [
+  {type:'Multi-vehicle collision',location:'I-285 W & Cascade Rd SW',lat:33.713,lng:-84.471,severity:'FATAL',vehicles:3,fatalities:0,injuries:4,weather:'Clear',road:'Dry',factors:['Speeding','Distracted'],desc:'3-vehicle collision blocking left 2 lanes, possible entrapment reported'},
+  {type:'Wrong-way driver',location:'I-75 N at Northside Dr',lat:33.788,lng:-84.415,severity:'FATAL',vehicles:1,fatalities:0,injuries:0,weather:'Clear',road:'Dry',factors:['DUI','Wrong-way'],desc:'Multiple 911 calls — wrong-way vehicle northbound on I-75'},
+  {type:'Debris in roadway',location:'I-20 E at Glenwood Ave',lat:33.742,lng:-84.330,severity:'MODERATE',vehicles:1,fatalities:0,injuries:1,weather:'Clear',road:'Dry',factors:['Road debris'],desc:'Large debris blocking right lane, possible tire blowout source'},
+  {type:'Pedestrian struck',location:'Moreland Ave SE & DeKalb Ave',lat:33.754,lng:-84.345,severity:'SERIOUS',vehicles:1,fatalities:0,injuries:1,weather:'Clear',road:'Dry',factors:['Pedestrian'],desc:'Pedestrian struck at crosswalk, caller reports victim conscious'},
+  {type:'Signal failure',location:'Buford Hwy NE & Clairmont Rd',lat:33.840,lng:-84.310,severity:'MODERATE',vehicles:0,fatalities:0,injuries:0,weather:'Rain',road:'Wet',factors:['Infrastructure'],desc:'Signal completely out, significant backup forming'},
+  {type:'Jackknifed tractor-trailer',location:'I-285 S at Langford Pkwy',lat:33.649,lng:-84.436,severity:'SERIOUS',vehicles:1,fatalities:0,injuries:1,weather:'Rain',road:'Wet',factors:['Large vehicle','Wet road'],desc:'18-wheeler jackknifed blocking 3 lanes, fuel leak reported'},
+  {type:'Multi-vehicle collision',location:'Donald Hollowell Pkwy & MLK Jr Dr',lat:33.756,lng:-84.448,severity:'SERIOUS',vehicles:2,fatalities:0,injuries:3,weather:'Clear',road:'Dry',factors:['Red light','Speeding'],desc:'2-vehicle T-bone, multiple airbag deployments'},
+  {type:'Hit and run',location:'Metropolitan Pkwy & Sylvan Rd SW',lat:33.689,lng:-84.416,severity:'SERIOUS',vehicles:1,fatalities:0,injuries:2,weather:'Clear',road:'Dry',factors:['Hit and run'],desc:'Victim on roadway, suspect fled northbound in dark sedan'},
+];
+
+let incCounter = 1;
+let liveIncidents = [];
+let selectedInc = null;
+let decisions = {};
+let currentTab = 'LIVE';
+let leafletMap = null;
+let mapMarkers = {};
+
+function mkIncident() {
+  const t = TEMPLATES[Math.floor(Math.random() * TEMPLATES.length)];
+  const minsAgo = Math.floor(Math.random() * 38) + 1;
+  return {...t, id:`INC-${String(incCounter++).padStart(4,'0')}`,isLive:true,status:'ACTIVE',
+    minsAgo, lat:t.lat+(Math.random()-0.5)*0.004, lng:t.lng+(Math.random()-0.5)*0.004};
+}
+
+function nearbyFARS(inc, r=0.07) {
+  return FARS.filter(f => Math.sqrt((f.lat-inc.lat)**2+(f.lng-inc.lng)**2) < r);
+}
+
+async function callClaude(messages, maxTok=900) {
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:maxTok,messages})
+  });
+  const d = await r.json();
+  return d.content.map(c=>c.text||'').join('');
+}
+
+async function triageIncident(inc) {
+  const hist = nearbyFARS(inc);
+  const now = new Date();
+  const prompt = `You are ARIA — Atlanta Road Intelligence Advisor for the City of Atlanta Road Safety Operations Center. Analyze this incident and return structured JSON.
+
+ACTIVE INCIDENT: ${JSON.stringify(inc)}
+
+HISTORICAL NHTSA FARS RECORDS NEARBY (within 0.07° radius): ${JSON.stringify(hist)}
+
+CURRENT TIME: ${now.toLocaleTimeString('en-US',{hour12:false})} ${now.toLocaleDateString('en-US',{weekday:'long'})}
+
+Return ONLY raw JSON (absolutely no markdown, no backticks, no commentary):
+{"severity_score":<1-10 integer>,"severity_label":"<CRITICAL|HIGH|ELEVATED|MODERATE>","situation_brief":"<2-3 crisp sentences for a dispatcher — what happened, what to expect>","response_units":["<unit>"],"est_clearance_min":<integer>,"lane_impact":"<one short phrase>","priority_actions":["<action1>","<action2>","<action3>"],"escalation_factors":["<factor if any>"],"historical_note":"<one sentence about this corridor from FARS data, or null if no nearby records>"}`;
+
+  const raw = await callClaude([{role:'user',content:prompt}]);
+  return JSON.parse(raw.replace(/```json|```/g,'').trim());
+}
+
+async function runNLQuery(q) {
+  const prompt = `You are ARIA, the AI assistant for Atlanta Road Safety Operations Center. Answer the operator's query directly and operationally.
+
+ACTIVE INCIDENTS (${liveIncidents.length} total): ${JSON.stringify(liveIncidents.slice(0,8))}
+HISTORICAL FARS: ${FARS.length} crash records across Fulton/DeKalb/Cobb/Gwinnett counties 2022-2023. ${FARS.filter(f=>f.severity==='FATAL').length} fatal incidents recorded.
+
+OPERATOR QUERY: "${q}"
+
+Respond in 2-4 sentences. Be direct. No preamble. No disclaimers.`;
+  return callClaude([{role:'user',content:prompt}], 400);
+}
+
+// ── UI HELPERS ──────────────────────────────────────────────────
+
+function badge(sev) {
+  const s = SEV[sev]||SEV.MINOR;
+  return `<span style="padding:2px 6px;border-radius:2px;font-size:9px;font-weight:700;font-family:'Barlow Condensed',sans-serif;letter-spacing:0.1em;color:${s.c};background:${s.bg};border:1px solid ${s.bd}">${sev}</span>`;
+}
+
+function renderCard(inc, isNew) {
+  const s = SEV[inc.severity]||SEV.MINOR;
+  const isSel = selectedInc && selectedInc.id === inc.id;
+  const timeStr = inc.isLive ? (inc.minsAgo===0?'just now':`${inc.minsAgo}m ago`) : inc.date;
+  const dot = inc.isLive ? `<span style="margin-right:3px;color:${s.c}">${inc.minsAgo===0?'<span class="blink">●</span>':'●'}</span>` : '○ ';
+  return `<div id="card-${inc.id}" class="${isNew?'new-card':''}" onclick="selectIncident('${inc.id}')" style="padding:8px 9px;margin-bottom:3px;cursor:pointer;background:${isSel?s.bg:C.panel2};border:1px solid ${isSel?s.bd:C.b1};border-left:3px solid ${s.c};border-radius:3px;transition:all 0.12s">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:3px">
+    <span style="color:${s.c};font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:0.04em;line-height:1.2;flex:1;padding-right:6px">${dot}${inc.type||inc.id}</span>
+    ${badge(inc.severity)}
+  </div>
+  <div style="color:${C.text2};font-size:10px;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${inc.location}</div>
+  <div style="display:flex;justify-content:space-between">
+    <span style="color:${C.muted};font-family:'IBM Plex Mono',monospace;font-size:8px">${inc.id}</span>
+    <span style="color:${C.text2};font-family:'IBM Plex Mono',monospace;font-size:8px">${timeStr}</span>
+  </div>
+</div>`;
+}
+
+function renderList() {
+  const list = currentTab === 'LIVE' ? liveIncidents : FARS;
+  document.getElementById('incident-list').innerHTML = list.map(inc=>renderCard(inc,false)).join('');
+  document.getElementById('feed-label').textContent = currentTab === 'LIVE'
+    ? `${liveIncidents.length} active incidents · Atlanta metro`
+    : `${FARS.length} records · NHTSA FARS 2022–2023`;
+  document.getElementById('live-count').textContent = `(${liveIncidents.length})`;
+}
+
+function switchTab(t) {
+  currentTab = t;
+  document.getElementById('tab-live').style.cssText = t==='LIVE'
+    ? 'flex:1;padding:7px 0;background:#0C1220;border:none;border-bottom:2px solid #00D2E0;color:#C0CFDF;font-family:Barlow Condensed,sans-serif;font-weight:700;font-size:11px;letter-spacing:0.1em;cursor:pointer'
+    : 'flex:1;padding:7px 0;background:transparent;border:none;border-bottom:2px solid transparent;color:#3A4F6C;font-family:Barlow Condensed,sans-serif;font-weight:700;font-size:11px;letter-spacing:0.1em;cursor:pointer';
+  document.getElementById('tab-hist').style.cssText = t==='HIST'
+    ? 'flex:1;padding:7px 0;background:#0C1220;border:none;border-bottom:2px solid #00D2E0;color:#C0CFDF;font-family:Barlow Condensed,sans-serif;font-weight:700;font-size:11px;letter-spacing:0.1em;cursor:pointer'
+    : 'flex:1;padding:7px 0;background:transparent;border:none;border-bottom:2px solid transparent;color:#3A4F6C;font-family:Barlow Condensed,sans-serif;font-weight:700;font-size:11px;letter-spacing:0.1em;cursor:pointer';
+  renderList();
+}
+
+function updateStats() {
+  document.getElementById('stat-active').querySelector('div').textContent = liveIncidents.length;
+  document.getElementById('stat-critical').querySelector('div').textContent = liveIncidents.filter(i=>i.severity==='FATAL').length;
+  document.getElementById('stat-resolved').querySelector('div').textContent = Object.values(decisions).length;
+}
+
+function selectIncident(id) {
+  const inc = [...liveIncidents,...FARS].find(i=>i.id===id);
+  if(!inc) return;
+  selectedInc = inc;
+  if(inc.isLive && currentTab!=='LIVE') switchTab('LIVE');
+  else if(!inc.isLive && currentTab!=='HIST') switchTab('HIST');
+  else renderList();
+  renderAIPanel(inc);
+  if(leafletMap) leafletMap.setView([inc.lat,inc.lng],13,{animate:true,duration:0.4});
+  updateMapMarkers();
+}
+
+function logDecision(id, action) {
+  decisions[id] = {action, time: new Date().toLocaleTimeString('en-US',{hour12:false})};
+  updateStats();
+  const dec = decisions[id];
+  const decDiv = document.getElementById('decision-area');
+  if(decDiv) {
+    const col = action==='ACCEPTED'?C.green:action==='ESCALATED'?C.red:C.amber;
+    decDiv.innerHTML = `<div style="padding:7px;background:${col}10;border:1px solid ${col}30;border-radius:3px;text-align:center"><span style="color:${col};font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:0.08em">✓ ${action} · ${dec.time}</span></div>`;
+  }
+}
+
+async function renderAIPanel(inc) {
+  const panel = document.getElementById('ai-panel');
+  const s = SEV[inc.severity]||SEV.MINOR;
+  const dec = decisions[inc.id];
+
+  panel.innerHTML = `<div style="padding:10px 12px;border-bottom:1px solid ${C.b1};flex-shrink:0;background:${C.panel}">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;color:${C.text};letter-spacing:0.04em;line-height:1.2;flex:1;padding-right:8px">${inc.type||inc.id}</div>
+      ${badge(inc.severity)}
+    </div>
+    <div style="color:${C.text2};font-size:10px;margin-bottom:8px">${inc.location}</div>
+    <div style="display:flex;gap:12px">
+      <div><div style="color:${C.muted};font-size:8px;font-family:'IBM Plex Mono',monospace;letter-spacing:0.1em">VEH</div><div style="color:${C.text};font-family:'IBM Plex Mono',monospace;font-size:16px;line-height:1">${inc.vehicles||0}</div></div>
+      <div><div style="color:${C.muted};font-size:8px;font-family:'IBM Plex Mono',monospace;letter-spacing:0.1em">INJ</div><div style="color:${C.text};font-family:'IBM Plex Mono',monospace;font-size:16px;line-height:1">${inc.injuries??'—'}</div></div>
+      <div><div style="color:${C.muted};font-size:8px;font-family:'IBM Plex Mono',monospace;letter-spacing:0.1em">FAT</div><div style="color:${(inc.fatalities??0)>0?C.red:C.text};font-family:'IBM Plex Mono',monospace;font-size:16px;line-height:1">${inc.fatalities??'—'}</div></div>
+      <div style="margin-left:auto"><div style="color:${C.muted};font-size:8px;font-family:'IBM Plex Mono',monospace;letter-spacing:0.1em">COND</div><div style="color:${C.text2};font-family:'IBM Plex Mono',monospace;font-size:10px;margin-top:3px">${inc.weather||'—'}/${inc.road||'—'}</div></div>
+    </div>
+  </div>
+  <div id="aria-analysis" style="padding:10px 12px">
+    <div style="display:flex;align-items:center;gap:8px;color:${C.text2};padding:10px 0">
+      <div style="width:6px;height:6px;background:${C.cyan};border-radius:50%" class="blink"></div>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-style:italic">ARIA analyzing incident...</span>
+    </div>
+  </div>`;
+
+  try {
+    const triage = await triageIncident(inc);
+    const sc = triage.severity_score>=8?C.red:triage.severity_score>=6?C.amber:C.green;
+    const isLive = inc.isLive;
+    const btns = isLive
+      ? [{l:'ACCEPT',c:C.green,a:'ACCEPTED'},{l:'OVERRIDE',c:C.amber,a:'OVERRIDDEN'},{l:'ESCALATE',c:C.red,a:'ESCALATED'}]
+      : [{l:'LOG ANALYSIS',c:C.blue,a:'ANALYSIS LOGGED'},{l:'FLAG CORRIDOR',c:C.amber,a:'CORRIDOR FLAGGED'},{l:'MARK REVIEWED',c:C.green,a:'REVIEWED'}];
+
+    const analysisEl = document.getElementById('aria-analysis');
+    if(!analysisEl) return;
+    analysisEl.className = 'fade-up';
+    analysisEl.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:${sc}10;border:1px solid ${sc}28;border-radius:3px;margin-bottom:10px">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:38px;font-weight:500;color:${sc};line-height:1">${triage.severity_score}</div>
+        <div>
+          <div style="color:${sc};font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;letter-spacing:0.1em">${triage.severity_label}</div>
+          <div style="color:${C.muted};font-size:8px;font-family:'IBM Plex Mono',monospace;margin-top:1px">ARIA SEVERITY /10</div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:10px">
+        <div style="color:${C.muted};font-size:8px;font-family:'Barlow Condensed',sans-serif;letter-spacing:0.12em;margin-bottom:4px">SITUATION BRIEF</div>
+        <div style="color:${C.text2};font-size:10px;line-height:1.65;padding-left:8px;border-left:2px solid ${C.b2}">${triage.situation_brief}</div>
+      </div>
+
+      <div style="display:flex;gap:5px;margin-bottom:10px">
+        <div style="flex:1;padding:5px 8px;background:${C.panel2};border:1px solid ${C.b1};border-radius:3px">
+          <div style="color:${C.muted};font-size:8px;font-family:'IBM Plex Mono',monospace;letter-spacing:0.1em;margin-bottom:2px">EST CLEARANCE</div>
+          <div style="color:${C.text};font-family:'IBM Plex Mono',monospace;font-size:10px">${triage.est_clearance_min} min</div>
+        </div>
+        <div style="flex:1;padding:5px 8px;background:${C.panel2};border:1px solid ${C.b1};border-radius:3px">
+          <div style="color:${C.muted};font-size:8px;font-family:'IBM Plex Mono',monospace;letter-spacing:0.1em;margin-bottom:2px">LANE IMPACT</div>
+          <div style="color:${C.text};font-family:'IBM Plex Mono',monospace;font-size:10px">${(triage.lane_impact||'—').substring(0,20)}</div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:10px">
+        <div style="color:${C.muted};font-size:8px;font-family:'Barlow Condensed',sans-serif;letter-spacing:0.12em;margin-bottom:5px">RECOMMENDED UNITS</div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px">${(triage.response_units||[]).map(u=>`<span style="padding:3px 7px;background:${C.cyan}12;border:1px solid ${C.cyan}30;border-radius:2px;color:${C.cyan};font-size:9px;font-family:'IBM Plex Mono',monospace">${u}</span>`).join('')}</div>
+      </div>
+
+      <div style="margin-bottom:10px">
+        <div style="color:${C.muted};font-size:8px;font-family:'Barlow Condensed',sans-serif;letter-spacing:0.12em;margin-bottom:5px">PRIORITY ACTIONS</div>
+        ${(triage.priority_actions||[]).map((a,i)=>`<div style="display:flex;gap:7px;margin-bottom:5px;align-items:flex-start"><span style="color:${C.amber};font-family:'IBM Plex Mono',monospace;font-size:9px;min-width:12px;flex-shrink:0">${i+1}.</span><span style="color:${C.text2};font-size:10px;line-height:1.5">${a}</span></div>`).join('')}
+      </div>
+
+      ${triage.historical_note?`<div style="padding:7px 9px;background:${C.blue}0C;border:1px solid ${C.blue}20;border-radius:3px;margin-bottom:10px">
+        <div style="color:${C.muted};font-size:8px;font-family:'Barlow Condensed',sans-serif;letter-spacing:0.12em;margin-bottom:3px">HISTORICAL CONTEXT · NHTSA FARS</div>
+        <div style="color:${C.blue};font-size:10px;line-height:1.55">${triage.historical_note}</div>
+      </div>`:''}
+
+      <div id="decision-area">
+        ${dec
+          ? `<div style="padding:7px;background:${dec.action==='ACCEPTED'?C.green:dec.action==='ESCALATED'?C.red:C.amber}10;border:1px solid ${dec.action==='ACCEPTED'?C.green:dec.action==='ESCALATED'?C.red:C.amber}30;border-radius:3px;text-align:center"><span style="color:${dec.action==='ACCEPTED'?C.green:dec.action==='ESCALATED'?C.red:C.amber};font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:0.08em">✓ ${dec.action} · ${dec.time}</span></div>`
+          : `<div style="display:flex;gap:5px">${btns.map(b=>`<button onclick="logDecision('${inc.id}','${b.a}')" style="flex:1;padding:7px 4px;background:${b.c}12;border:1px solid ${b.c}40;border-radius:3px;color:${b.c};font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:10px;letter-spacing:0.08em;cursor:pointer">${b.l}</button>`).join('')}</div>`
+        }
+      </div>`;
+  } catch(e) {
+    const el = document.getElementById('aria-analysis');
+    if(el) el.innerHTML = `<div style="color:${C.red};font-size:10px;font-family:'IBM Plex Mono',monospace;padding:8px 0">Analysis failed — check API connection</div>`;
+  }
+}
+
+async function submitQuery() {
+  const input = document.getElementById('nl-input');
+  const q = input.value.trim();
+  if(!q) return;
+  const btn = document.getElementById('query-btn');
+  btn.textContent = '..';
+  btn.disabled = true;
+  const resDiv = document.getElementById('aria-response');
+  resDiv.style.display = 'flex';
+  resDiv.innerHTML = `<span style="color:${C.cyan};font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:10px;letter-spacing:0.1em;flex-shrink:0;margin-top:1px">ARIA ▶</span><span style="color:${C.text2};font-size:10px;font-style:italic" class="blink">thinking...</span>`;
+  try {
+    const ans = await runNLQuery(q);
+    resDiv.innerHTML = `<span style="color:${C.cyan};font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:10px;letter-spacing:0.1em;flex-shrink:0;margin-top:1px">ARIA ▶</span><span style="color:${C.text2};font-size:10px;line-height:1.65">${ans}</span>`;
+  } catch { resDiv.innerHTML = `<span style="color:${C.red};font-size:10px;font-family:'IBM Plex Mono',monospace">Query failed.</span>`; }
+  btn.textContent = 'SEND'; btn.disabled = false; input.value = '';
+}
+
+document.getElementById('nl-input').addEventListener('keydown', e => { if(e.key==='Enter') submitQuery(); });
+
+// ── MAP ─────────────────────────────────────────────────────────
+
+function initMap() {
+  const L = window.L;
+  leafletMap = L.map('map', {zoomControl:true,attributionControl:false}).setView([33.749,-84.388],11);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18}).addTo(leafletMap);
+  updateMapMarkers();
+}
+
+function updateMapMarkers() {
+  if(!leafletMap) return;
+  const L = window.L;
+  Object.values(mapMarkers).forEach(m=>leafletMap.removeLayer(m));
+  mapMarkers = {};
+
+  FARS.forEach(f=>{
+    const s = SEV[f.severity]||SEV.MINOR;
+    const icon = L.divIcon({
+      html:`<div style="width:7px;height:7px;border-radius:50%;background:${s.c};opacity:0.55;border:1px solid ${s.c}"></div>`,
+      iconSize:[7,7],iconAnchor:[3,3],className:''
+    });
+    const m = L.marker([f.lat,f.lng],{icon}).addTo(leafletMap);
+    m.bindPopup(`<b>${f.location}</b><br>${f.severity} · ${f.date}<br>Factors: ${f.factors.join(', ')}<br>Vehicles: ${f.vehicles} · Fatalities: ${f.fatalities}`);
+    m.on('click',()=>{selectedInc=f;if(currentTab!=='HIST')switchTab('HIST');else renderList();renderAIPanel(f);updateMapMarkers();});
+    mapMarkers[f.id]=m;
+  });
+
+  liveIncidents.forEach(inc=>{
+    const s = SEV[inc.severity]||SEV.MINOR;
+    const isSel = selectedInc?.id===inc.id;
+    const sz = isSel?16:12;
+    const icon = L.divIcon({
+      html:`<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:${s.c};border:2px solid #fff;box-shadow:0 0 ${isSel?14:7}px ${s.c}80"></div>`,
+      iconSize:[sz,sz],iconAnchor:[sz/2,sz/2],className:''
+    });
+    const m = L.marker([inc.lat,inc.lng],{icon}).addTo(leafletMap);
+    m.bindPopup(`<b>● LIVE: ${inc.type}</b><br>${inc.location}<br>${inc.severity} · ${inc.minsAgo}m ago`);
+    m.on('click',()=>{selectedInc=inc;if(currentTab!=='LIVE')switchTab('LIVE');else renderList();renderAIPanel(inc);updateMapMarkers();});
+    mapMarkers[inc.id]=m;
+  });
+}
+
+// ── INIT ────────────────────────────────────────────────────────
+
+liveIncidents = Array.from({length:7},mkIncident);
+renderList();
+updateStats();
+
+function tick() {
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleTimeString('en-US',{hour12:false});
+}
+tick();
+setInterval(tick,1000);
+
+setInterval(()=>{
+  if(Math.random()<0.35){
+    const n = mkIncident();
+    liveIncidents = [n,...liveIncidents.slice(0,9)];
+    renderList();
+    updateStats();
+    updateMapMarkers();
+  }
+},28000);
+
+if(window.L) { initMap(); }
+else { const s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js'; s.onload=initMap; document.head.appendChild(s); }
+
+// Select first incident on load
+setTimeout(()=>{ if(liveIncidents.length) selectIncident(liveIncidents[0].id); }, 800);
+</script>
